@@ -1,10 +1,4 @@
-/*
- * 👋 Hello! This is an ml5.js example made and shared with ❤️.
- * Learn more about the ml5.js project: https://ml5js.org/
- * ml5.js license and Code of Conduct: https://github.com/ml5js/ml5-next-gen/blob/main/LICENSE.md
- *
- * This example demonstrates drawing skeletons on poses for the MoveNet model.
- */
+
 
 let video;
 let bodyPose;
@@ -24,7 +18,7 @@ function preload() {
 function setup() {
   createCanvas(innerWidth, innerHeight);
 
-  printAvailableResolutions(); 
+  //printAvailableResolutions(); 
 
   // Create the video and hide it
   video = createCapture(VIDEO);
@@ -45,6 +39,7 @@ function draw() {
   image(video, 0, 0, anchoVideo, altoVideo*1.2);
   pop();
 
+  
   push();
   // Draw the skeleton connections (mirrored)
   for (let i = 0; i < poses.length; i++) {
@@ -92,11 +87,11 @@ function draw() {
         translate(-xOffsetEsqueleto, 0);
         scale(2.5);
         circle(Kx, Ky, 10);
+        text(j, Kx+10, Ky);
         pop();
       }
     }
   }
-  pop();
 }
 
 // Callback function for when bodyPose outputs data
