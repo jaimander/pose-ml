@@ -1,5 +1,3 @@
-
-
 let video;
 let bodyPose;
 let poses = [];
@@ -7,41 +5,42 @@ let connections;
 let anchoVideo = 1280;
 let altoVideo = 720;
 let xOffsetVideo = 1000;
-let xOffsetEsqueleto = 600;
-let ajusteAltura = 1.2;
+let yOffsetVideo = 0;
+let xOffsetEsqueleto = 620;
+let yOffsetEsqueleto = 0;
+let camaras;
+let puntos = [];
+
+let camIndex = 0; // índice actual de la cámara
 
 function preload() {
-  // Load the bodyPose model
   bodyPose = ml5.bodyPose();
 }
 
-function setup() {
+async function setup() {
   createCanvas(innerWidth, innerHeight);
 
-  //printAvailableResolutions(); 
+  camaras = await ObtenerCamarasDisponibles();
+  console.log("Cámaras:", camaras);
 
-  // Create the video and hide it
-  video = createCapture(VIDEO);
-  video.size(anchoVideo, altoVideo*ajusteAltura);
-  video.hide();
+  iniciarCamara(camaras[0].deviceId);
 
-  // Start detecting poses in the webcam video
-  bodyPose.detectStart(video, gotPoses);
-  // Get the skeleton connection information
   connections = bodyPose.getSkeleton();
 }
 
 function draw() {
   background(0);
+  puntos = [];
+
+  // --- video ---
   push();
-  translate(width+xOffsetVideo, 0); // move to the right edge
-  scale(-2.5, 2.5); // flip horizontally
-  image(video, 0, 0, anchoVideo, altoVideo*1.2);
+  translate(width + xOffsetVideo, 0);
+  scale(-2.5, 2.5);
+  image(video, 0, 0, anchoVideo, altoVideo);
   pop();
 
-  
+  // --- skeleton ---
   push();
-  // Draw the skeleton connections (mirrored)
   for (let i = 0; i < poses.length; i++) {
     let pose = poses[i];
 
@@ -55,11 +54,11 @@ function draw() {
         stroke(255, 0, 0);
         strokeWeight(2);
 
-        // MIRROR coordinates
         const Ax = width - pointA.x;
         const Ay = pointA.y;
         const Bx = width - pointB.x;
         const By = pointB.y;
+
         push();
         translate(-xOffsetEsqueleto, 0);
         scale(2.5);
@@ -68,83 +67,92 @@ function draw() {
       }
     }
   }
+  pop();
 
-  // Draw keypoints (mirrored)
+  // --- keypoints ---
   for (let i = 0; i < poses.length; i++) {
     let pose = poses[i];
-
     for (let j = 0; j < pose.keypoints.length; j++) {
       let keypoint = pose.keypoints[j];
 
       if (keypoint.confidence > 0.1) {
-        fill(0, 255, 0);
-        noStroke();
-
-        // MIRROR coordinates
         const Kx = width - keypoint.x;
         const Ky = keypoint.y;
+
         push();
         translate(-xOffsetEsqueleto, 0);
         scale(2.5);
+        fill(0, 255, 0);
         circle(Kx, Ky, 10);
-        text(j, Kx+10, Ky);
+        text(j, Kx + 10, Ky);
         pop();
+
+        puntos.push(createVector(Kx, Ky));
       }
     }
   }
+
+  // --- ejemplo: distancia entre puntos 9 y 10 ---
+  if (puntos[9] && puntos[10]) {
+    let d = distanciaEntrePuntos(puntos[9], puntos[10]);
+    ellipse(width / 2, height / 2, d, d);
+  }
 }
 
-// Callback function for when bodyPose outputs data
+// ---------------------------------------------
+// FUNCIONES
+// ---------------------------------------------
+
+function distanciaEntrePuntos(a, b) {
+  return dist(a.x, a.y, b.x, b.y);
+}
+
 function gotPoses(results) {
-  // Save the output to the poses variable
   poses = results;
 }
 
+async function ObtenerCamarasDisponibles() {
+  const devices = await navigator.mediaDevices.enumerateDevices();
+  return devices.filter(d => d.kind === "videoinput");
+}
 
-async function printAvailableResolutions() {
-  const constraints = {
-    video: true
-  };
+// Inicializa una cámara (primera vez)
+function iniciarCamara(deviceId) {
+  video = createCapture({
+    video: {
+      deviceId: { exact: deviceId },
+      width: anchoVideo,
+      height: altoVideo,
+    },
+  });
 
-  try {
-    const devices = await navigator.mediaDevices.enumerateDevices();
-    const videoInputs = devices.filter(d => d.kind === 'videoinput');
+  video.hide();
+  bodyPose.detectStart(video, gotPoses);
+}
 
-    console.log("Video inputs:");
-    console.log(videoInputs);
+// Cambia la cámara en runtime
+async function cambiarCamara(deviceId) {
+  console.log("Cambiando a cámara:", deviceId);
 
-    for (let device of videoInputs) {
-      console.log(`\nTesting device: ${device.label}`);
+  // detener cámara actual
+  if (video && video.elt && video.elt.srcObject) {
+    let tracks = video.elt.srcObject.getTracks();
+    tracks.forEach(t => t.stop());
+  }
 
-      // Try a list of common resolutions
-      const testResolutions = [
-        [160, 120],
-        [320, 240],
-        [640, 480],
-        [800, 600],
-        [1024, 576],
-        [1280, 720],
-        [1920, 1080],
-        [2560, 1440],
-        [3840, 2160]
-      ];
+  // remover capture de p5
+  if (video) video.remove();
 
-      for (let [w, h] of testResolutions) {
-        try {
-          await navigator.mediaDevices.getUserMedia({
-            video: {
-              deviceId: device.deviceId,
-              width: { exact: w },
-              height: { exact: h }
-            }
-          });
-          console.log(`✔️ Supported: ${w}x${h}`);
-        } catch (err) {
-          console.log(`❌ Not supported: ${w}x${h}`);
-        }
-      }
-    }
-  } catch (err) {
-    console.error("Error listing resolutions:", err);
+  // crear nueva cámara
+  iniciarCamara(deviceId);
+}
+
+// ---------------------------------------------
+// TECLA 'C' PARA ROTAR CÁMARAS
+// ---------------------------------------------
+function keyPressed() {
+  if (key === 'c' || key === 'C') {
+    camIndex = (camIndex + 1) % camaras.length;
+    cambiarCamara(camaras[camIndex].deviceId);
   }
 }
