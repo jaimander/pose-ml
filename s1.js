@@ -31,6 +31,7 @@ async function setup() {
 function draw() {
   background(0);
   puntos = [];
+  
 
   // --- video ---
   push();
@@ -118,6 +119,8 @@ async function ObtenerCamarasDisponibles() {
 
 // Inicializa una cámara (primera vez)
 function iniciarCamara(deviceId) {
+  poses = []; 
+
   video = createCapture({
     video: {
       deviceId: { exact: deviceId },
@@ -127,7 +130,11 @@ function iniciarCamara(deviceId) {
   });
 
   video.hide();
-  bodyPose.detectStart(video, gotPoses);
+   
+  video.elt.onloadeddata = () => {
+    console.log("Video listo, iniciando pose detection");
+    bodyPose.detectStart(video, gotPoses);
+  };
 }
 
 // Cambia la cámara en runtime
@@ -154,5 +161,6 @@ function keyPressed() {
   if (key === 'c' || key === 'C') {
     camIndex = (camIndex + 1) % camaras.length;
     cambiarCamara(camaras[camIndex].deviceId);
+    connections = bodyPose.getSkeleton();
   }
 }
