@@ -10,11 +10,18 @@ let xOffsetEsqueleto = 620;
 let yOffsetEsqueleto = 0;
 let camaras;
 let puntos = [];
+let video1;
+let estadoVideo1 = false;
+let video1YaFueActivado = false;
+let mostrarEsqueleto = true;
+let mostrarEspejo = true;
+let gestoCerrar = false;
 
 let camIndex = 0; // índice actual de la cámara
 
 function preload() {
   bodyPose = ml5.bodyPose();
+  video1 = createVideo("assets/videoplayback.mp4");
 }
 
 async function setup() {
@@ -26,19 +33,28 @@ async function setup() {
   iniciarCamara(camaras[0].deviceId);
 
   connections = bodyPose.getSkeleton();
+
+  video1.loop(); // reproduce en bucle
+  video1.hide();
 }
 
 function draw() {
   background(0);
+
   puntos = [];
-  
 
   // --- video ---
   push();
   translate(width + xOffsetVideo, 0);
   scale(-2.5, 2.5);
+  //scale(1);
   image(video, 0, 0, anchoVideo, altoVideo);
   pop();
+
+  if (!mostrarEspejo) {
+    fill(0);
+    rect(0, 0, width, height);
+  }
 
   // --- skeleton ---
   push();
@@ -63,7 +79,10 @@ function draw() {
         push();
         translate(-xOffsetEsqueleto, 0);
         scale(2.5);
-        line(Ax, Ay, Bx, By);
+        //scale(1);
+        if (mostrarEsqueleto) {
+          line(Ax, Ay, Bx, By);
+        }
         pop();
       }
     }
@@ -83,9 +102,13 @@ function draw() {
         push();
         translate(-xOffsetEsqueleto, 0);
         scale(2.5);
+        //scale(1);
         fill(0, 255, 0);
-        circle(Kx, Ky, 10);
-        text(j, Kx + 10, Ky);
+        if (mostrarEsqueleto) {
+          circle(Kx, Ky, 10);
+          text(j, Kx + 10, Ky);
+        }
+
         pop();
 
         puntos.push(createVector(Kx, Ky));
@@ -96,7 +119,48 @@ function draw() {
   // --- ejemplo: distancia entre puntos 9 y 10 ---
   if (puntos[9] && puntos[10]) {
     let d = distanciaEntrePuntos(puntos[9], puntos[10]);
-    ellipse(width / 2, height / 2, d, d);
+    //ellipse(width / 2, height / 2, d, d);
+    if (video1YaFueActivado == false) {
+      if (d > 200) {
+        video1.play();
+        estadoVideo1 = true;
+        video1YaFueActivado = true;
+      }
+    }
+
+    if (video1YaFueActivado) {
+      if (d < 180) {
+        estadoVideo1 = false;
+        video1YaFueActivado = false;
+      }
+    }
+  }
+
+  if (estadoVideo1) {
+    // image(video1, 0, 0, width * 2, height);
+  }
+
+  if (puntos[9] && puntos[10] && puntos[0]) {
+    let d1 = distanciaEntrePuntos(puntos[9], puntos[10]);
+    let d2 = distanciaEntrePuntos(puntos[10], puntos[0]);
+
+    if (d1 < 100 && d2 < 100) {
+      gestoCerrar = true;
+    }
+    if (d1 > 100) {
+      gestoCerrar = false;
+      // iniciarCamara();
+    }
+  }
+
+  console.log(poses.length);
+  if (poses.length > 0) {
+    mostrarEspejo = true;
+    if (gestoCerrar) {
+      mostrarEspejo = false;
+    }
+  } else {
+    mostrarEspejo = false;
   }
 }
 
@@ -114,12 +178,12 @@ function gotPoses(results) {
 
 async function ObtenerCamarasDisponibles() {
   const devices = await navigator.mediaDevices.enumerateDevices();
-  return devices.filter(d => d.kind === "videoinput");
+  return devices.filter((d) => d.kind === "videoinput");
 }
 
 // Inicializa una cámara (primera vez)
 function iniciarCamara(deviceId) {
-  poses = []; 
+  poses = [];
 
   video = createCapture({
     video: {
@@ -130,7 +194,7 @@ function iniciarCamara(deviceId) {
   });
 
   video.hide();
-   
+
   video.elt.onloadeddata = () => {
     console.log("Video listo, iniciando pose detection");
     bodyPose.detectStart(video, gotPoses);
@@ -144,7 +208,7 @@ async function cambiarCamara(deviceId) {
   // detener cámara actual
   if (video && video.elt && video.elt.srcObject) {
     let tracks = video.elt.srcObject.getTracks();
-    tracks.forEach(t => t.stop());
+    tracks.forEach((t) => t.stop());
   }
 
   // remover capture de p5
@@ -158,9 +222,28 @@ async function cambiarCamara(deviceId) {
 // TECLA 'C' PARA ROTAR CÁMARAS
 // ---------------------------------------------
 function keyPressed() {
-  if (key === 'c' || key === 'C') {
+  if (key === "c" || key === "C") {
     camIndex = (camIndex + 1) % camaras.length;
     cambiarCamara(camaras[camIndex].deviceId);
     connections = bodyPose.getSkeleton();
+  }
+  if (key == "v" || key == "V") {
+    video1.play();
+    estadoVideo1 = true;
+  }
+  if (key == "e" || key == "E") {
+    if (mostrarEsqueleto == true) {
+      mostrarEsqueleto = false;
+    } else {
+      mostrarEsqueleto = true;
+    }
+  }
+
+  if (key == "a" || key == "A") {
+    if (mostrarEspejo == true) {
+      mostrarEspejo = false;
+    } else {
+      mostrarEspejo = true;
+    }
   }
 }
